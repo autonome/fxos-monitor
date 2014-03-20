@@ -1,0 +1,114 @@
+<!doctype html>
+<head>
+  <title>fxos device monitor</title>
+  <link type="text/css" rel="stylesheet" href="style/rickshaw-graph.css">
+  <link type="text/css" rel="stylesheet" href="style/rickshaw-detail.css">
+  <link type="text/css" rel="stylesheet" href="style/rickshaw-legend.css">
+  <link type="text/css" rel="stylesheet" href="style/rickshaw-custom-lines.css">
+</head>
+<body>
+
+<div id="container">
+</div>
+
+<script src="d3.v3.min.js"></script>
+<script src="rickshaw.js"></script>
+<script src="socket.io.js"></script>
+<script>
+
+var socket = io.connect('http://localhost:8088'),
+    timeIntervalInMs = 100,
+    graphContainer = document.querySelector('#container')
+
+// the process graphs
+var graphs = {}
+
+function selectorize(str) {
+  return str.replace(/[();:.]/g, '').replace(' ', '-')
+}
+
+function initGraph(container, name) {
+  /*
+  container.innerHTML += '<div style="overflow:hidden; height:0; z-index: -1000;">' +
+    '<div id="background-' + name + '" style="font-size: 3em; color: silver; opacity: 0.2; font-weight: bold;">' +
+    name.toUpperCase() +
+    '</div></div>'
+  */
+
+  //container.innerHTML += '<div style="font-size: 3em; color: silver; opacity: 0.2; font-weight: bold;">' + name + '</div>'
+
+  var graphElement = document.createElement('div')
+  graphElement.id = name
+  graphElement.classList.add('graph')
+  graphElement.style = 'background:-moz-element(#background-' + name + ') no-repeat;'
+  container.appendChild(graphElement)
+
+  var legendElement = document.createElement('div')
+  legendElement.id = 'legend-' + name
+  container.appendChild(legendElement)
+
+  var graph = new Rickshaw.Graph({
+    element: graphElement,
+    width: 500,
+    height: 50,
+    max: 50,
+    renderer: 'line',
+    series: new Rickshaw.Series.FixedDuration(
+      [ { name: 'USS' }, { name: 'CPU' }],
+      undefined, // palette
+      {
+        timeInterval: timeIntervalInMs,
+        maxDataPoints: 50,
+        timeBase: (new Date().getTime()) / 1000
+      }) 
+  });
+
+  /*
+  var hoverDetail = new Rickshaw.Graph.HoverDetail({
+    graph: graph
+  });
+
+  var legend = new Rickshaw.Graph.Legend({
+    graph: graph,
+    element: legendElement
+  });
+
+  var shelving = new Rickshaw.Graph.Behavior.Series.Toggle({
+    graph: graph,
+  });
+
+  var highlighter = new Rickshaw.Graph.Behavior.Series.Highlight({
+    graph: graph,
+  });
+
+  var axes = new Rickshaw.Graph.Axis.Time({
+    graph: graph
+  });
+  axes.render();
+  */
+
+  return graph;
+}
+
+function handleProcessMessage(msg) {
+  msg.data.forEach(function(process) {
+    var name = selectorize(process[0])
+    if (!graphs[name])
+      graphs[name] = initGraph(graphContainer, name)
+    console.log(name, process[5])
+    graphs[name].series.addData({
+      USS: process[5]
+    })
+    graphs[name].render()
+  })
+}
+
+socket.on('tick', function (msg) {
+  if (msg.type == 'process') {
+    handleProcessMessage(msg)
+  }
+})
+
+</script>
+
+</body>

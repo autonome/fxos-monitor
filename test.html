@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Cubism Page Template</title>
+
+  <!-- Import Cubism and its dependency D3 -->
+  <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+  <script src="https://raw.github.com/square/cubism/master/cubism.v1.min.js"></script>
+
+  <!-- Import missing-data and it's dependency Underscore -->
+  <script src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.5.1/underscore-min.js"></script>
+  <script src="missing-data.js" charset="utf-8"></script>
+
+  <link rel="stylesheet" type="text/css" href="main.css">
+</head>
+<body>
+<div id="demo"></div>
+
+<script type="text/javascript">
+  var current_date = new Date();                                                     
+
+  // You can use this formula to calculate the offset:
+  // [ { Number of minutes elapsed today }
+  // - { Time your data ends in minutes(in this case 4:30 PM or 960 minutes) + 10 } ]
+  var offset_mins = ((60*current_date.getHours()) + current_date.getMinutes()) - 970;
+
+  // Don't forget to convert this to milliseconds!
+  var offset_millis = offset_mins * 60 * 1000;   
+
+  var context = cubism.context()
+    .step(6e4) // Distance between data points in milliseconds
+    .size(400) // Number of data points
+    .serverDelay(offset_millis)
+    .stop();   // Fetching from a static data source; don't update values
+
+  d3.select("body").append("div") // Add a vertical rule
+    .attr("class", "rule")        // to the graph
+    .call(context.rule());
+
+  function stock(name) { 
+    return context.metric(function(start, stop, step, callback) {
+      d3.json("data/" + name + ".json", function(original_rows) {
+        var rows = md.ffill(original_rows); 
+
+        var compare = rows[0][1], value = rows[0][1], values = [value];
+
+        // Creates an array of the price differences throughout the day
+        rows.forEach(function(d) {
+          values.push(value = (d[1] - compare) / compare);
+        }); 
+        callback(null, values);
+      }); 
+    }, name); 
+  }
+
+  function draw_graph(stocks_list) {
+    d3.select("#demo")                 // Select the div on which we want to act           
+      .selectAll(".axis")              // This is a standard D3 mechanism to
+      .data(["top"])                   // bind data to a graph. In this case
+      .enter()                         // we're binding the axes "top" and "bottom".
+      .append("div")                   // Create two divs and 
+      .attr("class", function(d) {     // give them the classes
+          return d + " axis";            // top axis and bottom axis
+          })                               // respectively 
+    .each(function(d) {              // For each of these axes,
+        d3.select(this)                // draw the axes with 4 intervals
+        .call(context.axis()         // and place them in their proper places
+          .ticks(4).orient(d)); 
+        });
+
+
+    d3.select("#demo")                 
+      .selectAll(".horizon")           
+      .data(stocks_list.map(stock))    
+      .enter()                         
+      .insert("div", ".bottom")        // Insert the graph in a div  
+      .attr("class", "horizon")        // Turn the div into
+      .call(context.horizon()          // a horizon graph
+          .format(d3.format("+,.2p")));    // Format the values to 2 floating-point decimals
+
+
+    context.on("focus", function(i) {
+      d3.selectAll(".value").style("right",                  // Make the rule coincide 
+        i == null ? null : context.size() - i + "px"); // with the mouse
+    });
+  } 
+
+  draw_graph(["BEAM", "BF.B", "STZ"]);
+</script>
+</body>
+</html>
